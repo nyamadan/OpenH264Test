@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace OpenH264Test
@@ -30,18 +31,12 @@ namespace OpenH264Test
             var _Initialize = Marshal.GetDelegateForFunctionPointer<Initialize>(methods[0]);
             var _SetOption = Marshal.GetDelegateForFunctionPointer<SetOption>(methods[7]);
 
-            // I420
-            unsafe
-            {
-                var videoFormat = 23;
-                rv = _SetOption(pEncoder, 0, new IntPtr(&videoFormat));
-            }
-
             // Log: detail
             unsafe
             {
                 var logLevel = 1 << 4;
                 rv = _SetOption(pEncoder, 25, new IntPtr(&logLevel));
+                Debug.Assert(rv == 0);
             }
 
             var param = new byte[24];
@@ -57,7 +52,16 @@ namespace OpenH264Test
                 fixed (byte* p = param)
                 {
                     rv = _Initialize(pEncoder, new IntPtr(p));
+                    Debug.Assert(rv == 0);
                 }
+            }
+
+            // I420
+            unsafe
+            {
+                var videoFormat = 23;
+                rv = _SetOption(pEncoder, 0, new IntPtr(&videoFormat));
+                Debug.Assert(rv == 0);
             }
 
             WelsDestroySVCEncoder(pEncoder);
