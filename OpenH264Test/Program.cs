@@ -16,11 +16,14 @@ namespace OpenH264Test
 
         private static byte[] CreateSourcePicture()
         {
-            var bytes = Environment.Is64BitProcess ? new byte[68] : new byte[52];
+            var bytes = new byte[72];
             var offset = 0;
 
             // int iColorFormat;
             BitConverter.GetBytes(0).CopyTo(bytes, offset);
+            offset += 4;
+
+            // alignment
             offset += 4;
 
             // int iStride[4];
@@ -30,22 +33,11 @@ namespace OpenH264Test
                 offset += 4;
             }
 
-            if(Environment.Is64BitProcess)
+            // unsigned char* pData[4];
+            for(var i = 0; i < 4; i++)
             {
-                // unsigned char* pData[4];
-                for(var i = 0; i < 4; i++)
-                {
-                    BitConverter.GetBytes(0L).CopyTo(bytes, offset);
-                    offset += 8;
-                }
-            } else
-            {
-                // unsigned char* pData[4];
-                for(var i = 0; i < 4; i++)
-                {
-                    BitConverter.GetBytes(0).CopyTo(bytes, offset);
-                    offset += 4;
-                }
+                BitConverter.GetBytes(0L).CopyTo(bytes, offset);
+                offset += 8;
             }
 
             // int iPicWidth;
@@ -65,11 +57,14 @@ namespace OpenH264Test
 
         private static byte[] CreateFrameBSInfo()
         {
-            var bytes = Environment.Is64BitProcess ? new byte[4116] : new byte[3092];
+            var bytes = new byte[5144];
             var offset = 0;
 
             // int iLayerNum;
             BitConverter.GetBytes(0).CopyTo(bytes, offset);
+            offset += 4;
+
+            // alignment
             offset += 4;
 
             // SLayerBSInfo sLayerInfo[MAX_LAYER_NUM_OF_FRAME];
@@ -107,6 +102,9 @@ namespace OpenH264Test
             bytes[offset] = 0;
             offset += 1;
 
+            // alignment
+            offset += 1;
+
             // EVideoFrameType eFrameType;
             BitConverter.GetBytes(0).CopyTo(bytes, offset);
             offset += 4;
@@ -114,6 +112,9 @@ namespace OpenH264Test
             // unsigned char uiLayerType;
             bytes[offset] = 0;
             offset += 1;
+
+            // alignment
+            offset += 3;
 
             // int iSubSeqId;
             BitConverter.GetBytes(0).CopyTo(bytes, offset);
@@ -123,26 +124,16 @@ namespace OpenH264Test
             BitConverter.GetBytes(0).CopyTo(bytes, offset);
             offset += 4;
 
-            if(Environment.Is64BitProcess)
-            {
-                // int* pNalLengthInByte;
-                BitConverter.GetBytes(0L).CopyTo(bytes, offset);
-                offset += 8;
+            // alignment
+            offset += 4;
 
-                // unsigned char* pBsBuf;
-                BitConverter.GetBytes(0L).CopyTo(bytes, offset);
-                offset += 8;
-            }
-            else
-            {
-                // int* pNalLengthInByte;
-                BitConverter.GetBytes(0).CopyTo(bytes, offset);
-                offset += 4;
+            // int* pNalLengthInByte;
+            BitConverter.GetBytes(0L).CopyTo(bytes, offset);
+            offset += 8;
 
-                // unsigned char* pBsBuf;
-                BitConverter.GetBytes(0).CopyTo(bytes, offset);
-                offset += 4;
-            }
+            // unsigned char* pBsBuf;
+            BitConverter.GetBytes(0L).CopyTo(bytes, offset);
+            offset += 8;
 
             return offset;
         }
