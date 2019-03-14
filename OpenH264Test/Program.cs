@@ -29,6 +29,7 @@ namespace OpenH264Test
             var methods = new IntPtr[10];
             Marshal.Copy(Marshal.ReadIntPtr(pEncoder, 0), methods, 0, methods.Length);
             var _Initialize = Marshal.GetDelegateForFunctionPointer<Initialize>(methods[0]);
+            var _Uninitialize = Marshal.GetDelegateForFunctionPointer<Uninitialize>(methods[3]);
             var _SetOption = Marshal.GetDelegateForFunctionPointer<SetOption>(methods[7]);
 
             // Log: detail
@@ -68,7 +69,25 @@ namespace OpenH264Test
             var data = new byte[frameSize];
 
             var info = new SFrameBSInfo();
+            info.LayerNum = 0;
             info.LayerInfo = new SLayerBSInfo[128];
+            for (var i = 0; i < info.LayerInfo.Length; i++)
+            {
+                var layer = info.LayerInfo[i];
+                layer.TemporalId = 0;
+                layer.SpatialId = 0;
+                layer.QualityId = 0;
+                layer.FrameType = 0;
+                layer.LayerType = 0;
+                layer.SubSeqId = 0;
+                layer.NalCount = 0;
+                layer.NalLengthInByte = IntPtr.Zero;
+                layer.BsBuf = IntPtr.Zero;
+            }
+
+            info.FrameType = 0;
+            info.FrameSizeInBytes = 0;
+            info.TimeStamp = 0L;
 
             var pic = new SSourcePicture();
             pic.PicWidth = width;
@@ -78,6 +97,7 @@ namespace OpenH264Test
             pic.Data = new IntPtr[4];
             pic.Stride[0] = pic.PicWidth;
             pic.Stride[1] = pic.Stride[2] = pic.PicWidth >> 1;
+            pic.TimeStamp = 0;
 
             unsafe
             {
@@ -89,7 +109,13 @@ namespace OpenH264Test
                 }
             }
 
-            WelsDestroySVCEncoder(pEncoder);
+            if (pEncoder != IntPtr.Zero)
+            {
+                rv = _Uninitialize(pEncoder);
+                Debug.Assert(rv == 0);
+                WelsDestroySVCEncoder(pEncoder);
+                pEncoder = IntPtr.Zero;
+            }
 
             return 0;
         }
@@ -151,6 +177,9 @@ namespace OpenH264Test
 
         [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
         private delegate int Initialize(IntPtr self, IntPtr param);
+
+        [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
+        private delegate int Uninitialize(IntPtr self);
 
         [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
         private delegate int SetOption(IntPtr self, int eOptionId, IntPtr pOption);
