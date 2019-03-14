@@ -14,130 +14,6 @@ namespace OpenH264Test
         [DllImport(OpenH264LibraryName)]
         public static extern int WelsDestroySVCEncoder(IntPtr pEncoder);
 
-        private static byte[] CreateSourcePicture()
-        {
-            var bytes = new byte[72];
-            var offset = 0;
-
-            // int iColorFormat;
-            BitConverter.GetBytes(0).CopyTo(bytes, offset);
-            offset += 4;
-
-            // alignment
-            offset += 4;
-
-            // int iStride[4];
-            for(var i = 0; i < 4; i++)
-            {
-                BitConverter.GetBytes(0).CopyTo(bytes, offset);
-                offset += 4;
-            }
-
-            // unsigned char* pData[4];
-            for(var i = 0; i < 4; i++)
-            {
-                BitConverter.GetBytes(0L).CopyTo(bytes, offset);
-                offset += 8;
-            }
-
-            // int iPicWidth;
-            BitConverter.GetBytes(0).CopyTo(bytes, offset);
-            offset += 4;
-
-            // int iPicHeight;
-            BitConverter.GetBytes(0).CopyTo(bytes, offset);
-            offset += 4;
-
-            // long long uiTimeStamp;
-            BitConverter.GetBytes(0L).CopyTo(bytes, offset);
-            offset += 8;
-
-            return bytes;
-        }
-
-        private static byte[] CreateFrameBSInfo()
-        {
-            var bytes = new byte[5144];
-            var offset = 0;
-
-            // int iLayerNum;
-            BitConverter.GetBytes(0).CopyTo(bytes, offset);
-            offset += 4;
-
-            // alignment
-            offset += 4;
-
-            // SLayerBSInfo sLayerInfo[MAX_LAYER_NUM_OF_FRAME];
-            for(var i = 0; i < 128; i++)
-            {
-                offset = ApplyLayerInfo(bytes, offset);
-            }
-
-            // EVideoFrameType eFrameType;
-            BitConverter.GetBytes(0).CopyTo(bytes, offset);
-            offset += 4;
-
-            // int iFrameSizeInBytes;
-            BitConverter.GetBytes(0).CopyTo(bytes, offset);
-            offset += 4;
-
-            // long long uiTimeStamp;
-            BitConverter.GetBytes(0L).CopyTo(bytes, offset);
-            offset += 8;
-
-            return bytes;
-        }
-
-        private static int ApplyLayerInfo(byte[] bytes, int offset)
-        {
-            // unsigned char uiTemporalId;
-            bytes[offset] = 0;
-            offset += 1;
-
-            // unsigned char uiSpatialId;
-            bytes[offset] = 0;
-            offset += 1;
-
-            // unsigned char uiQualityId;
-            bytes[offset] = 0;
-            offset += 1;
-
-            // alignment
-            offset += 1;
-
-            // EVideoFrameType eFrameType;
-            BitConverter.GetBytes(0).CopyTo(bytes, offset);
-            offset += 4;
-
-            // unsigned char uiLayerType;
-            bytes[offset] = 0;
-            offset += 1;
-
-            // alignment
-            offset += 3;
-
-            // int iSubSeqId;
-            BitConverter.GetBytes(0).CopyTo(bytes, offset);
-            offset += 4;
-
-            // int iNalCount;
-            BitConverter.GetBytes(0).CopyTo(bytes, offset);
-            offset += 4;
-
-            // alignment
-            offset += 4;
-
-            // int* pNalLengthInByte;
-            BitConverter.GetBytes(0L).CopyTo(bytes, offset);
-            offset += 8;
-
-            // unsigned char* pBsBuf;
-            BitConverter.GetBytes(0L).CopyTo(bytes, offset);
-            offset += 8;
-
-            return offset;
-        }
-
         private static int Main(string[] args)
         {
             if (!Environment.Is64BitProcess) return -1;
@@ -163,21 +39,21 @@ namespace OpenH264Test
                 Debug.Assert(rv == 0);
             }
 
-            var param = new byte[24];
-            BitConverter.GetBytes(0).CopyTo(param, 0);
-            BitConverter.GetBytes(320).CopyTo(param, 4);
-            BitConverter.GetBytes(240).CopyTo(param, 8);
-            BitConverter.GetBytes(500000).CopyTo(param, 12);
-            BitConverter.GetBytes(1).CopyTo(param, 16);
-            BitConverter.GetBytes(15.0f).CopyTo(param, 20);
+            const int width = 320;
+            const int height = 240;
+
+            var param = new SEncParamBase();
+            param.UsageType = 0;
+            param.PicWidth = width;
+            param.PicHeight = height;
+            param.TargetBitrate = 500000;
+            param.RCMode = 1;
+            param.MaxFrameRate = 15.0f;
 
             unsafe
             {
-                fixed (byte* p = param)
-                {
-                    rv = _Initialize(pEncoder, new IntPtr(p));
-                    Debug.Assert(rv == 0);
-                }
+                rv = _Initialize(pEncoder, new IntPtr(&param));
+                Debug.Assert(rv == 0);
             }
 
             // I420
@@ -188,9 +64,89 @@ namespace OpenH264Test
                 Debug.Assert(rv == 0);
             }
 
+            var frameSize = width * height * 3 / 2;
+            var data = new byte[frameSize];
+
+            var info = new SFrameBSInfo();
+            info.LayerInfo = new SLayerBSInfo[128];
+
+            var pic = new SSourcePicture();
+            pic.PicWidth = width;
+            pic.PicHeight = height;
+            pic.ColorFormat = 23;
+            pic.Stride = new int[4];
+            pic.Data = new IntPtr[4];
+            pic.Stride[0] = pic.PicWidth;
+            pic.Stride[1] = pic.Stride[2] = pic.PicWidth >> 1;
+
+            unsafe
+            {
+                fixed (void* pData = data)
+                {
+                    pic.Data[0] = new IntPtr(pData);
+                    pic.Data[1] = pic.Data[0] + width * height;
+                    pic.Data[2] = pic.Data[1] + ((width * height) >> 2);
+                }
+            }
+
             WelsDestroySVCEncoder(pEncoder);
 
             return 0;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SEncParamBase
+        {
+            public int UsageType;
+            public int PicWidth;
+            public int PicHeight;
+            public int TargetBitrate;
+            public int RCMode;
+            public float MaxFrameRate;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SSourcePicture
+        {
+            public int ColorFormat;
+
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+            public int[] Stride;
+
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+            public IntPtr[] Data;
+
+            public int PicWidth;
+            public int PicHeight;
+            public long TimeStamp;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SLayerBSInfo
+        {
+            public byte TemporalId;
+            public byte SpatialId;
+            public byte QualityId;
+            public int FrameType;
+            public byte LayerType;
+
+            public int SubSeqId;
+            public int NalCount;
+            public IntPtr NalLengthInByte;
+            public IntPtr BsBuf;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SFrameBSInfo
+        {
+            public int LayerNum;
+
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 128)]
+            public SLayerBSInfo[] LayerInfo;
+
+            public int FrameType;
+            public int FrameSizeInBytes;
+            public long TimeStamp;
         }
 
         [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
