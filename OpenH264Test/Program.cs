@@ -30,6 +30,7 @@ namespace OpenH264Test
             Marshal.Copy(Marshal.ReadIntPtr(pEncoder, 0), methods, 0, methods.Length);
             var _Initialize = Marshal.GetDelegateForFunctionPointer<Initialize>(methods[0]);
             var _Uninitialize = Marshal.GetDelegateForFunctionPointer<Uninitialize>(methods[3]);
+            var _EncodeFrame = Marshal.GetDelegateForFunctionPointer<EncodeFrame>(methods[4]);
             var _SetOption = Marshal.GetDelegateForFunctionPointer<SetOption>(methods[7]);
 
             // Log: detail
@@ -40,15 +41,15 @@ namespace OpenH264Test
                 Debug.Assert(rv == 0);
             }
 
-            const int width = 320;
-            const int height = 240;
+            const int width = 640;
+            const int height = 480;
 
             var param = new SEncParamBase();
-            param.UsageType = 0;
+            param.UsageType = 1;
             param.PicWidth = width;
             param.PicHeight = height;
             param.TargetBitrate = 500000;
-            param.RCMode = 1;
+            param.RCMode = 0;
             param.MaxFrameRate = 15.0f;
 
             unsafe
@@ -70,21 +71,6 @@ namespace OpenH264Test
 
             var info = new SFrameBSInfo();
             info.LayerNum = 0;
-            info.LayerInfo = new SLayerBSInfo[128];
-            for (var i = 0; i < info.LayerInfo.Length; i++)
-            {
-                var layer = info.LayerInfo[i];
-                layer.TemporalId = 0;
-                layer.SpatialId = 0;
-                layer.QualityId = 0;
-                layer.FrameType = 0;
-                layer.LayerType = 0;
-                layer.SubSeqId = 0;
-                layer.NalCount = 0;
-                layer.NalLengthInByte = IntPtr.Zero;
-                layer.BsBuf = IntPtr.Zero;
-            }
-
             info.FrameType = 0;
             info.FrameSizeInBytes = 0;
             info.TimeStamp = 0L;
@@ -93,19 +79,29 @@ namespace OpenH264Test
             pic.PicWidth = width;
             pic.PicHeight = height;
             pic.ColorFormat = 23;
-            pic.Stride = new int[4];
-            pic.Data = new IntPtr[4];
-            pic.Stride[0] = pic.PicWidth;
-            pic.Stride[1] = pic.Stride[2] = pic.PicWidth >> 1;
             pic.TimeStamp = 0;
-
             unsafe
             {
+                pic.Stride[0] = pic.PicWidth;
+                pic.Stride[1] = pic.Stride[2] = pic.PicWidth >> 1;
+
                 fixed (void* pData = data)
                 {
-                    pic.Data[0] = new IntPtr(pData);
-                    pic.Data[1] = pic.Data[0] + width * height;
-                    pic.Data[2] = pic.Data[1] + ((width * height) >> 2);
+                    pic.pData[0] = (long) pData;
+                    pic.pData[1] = pic.pData[0] + width * height;
+                    pic.pData[2] = pic.pData[1] + ((width * height) >> 2);
+
+                    rv = _EncodeFrame(pEncoder, new IntPtr(&pic), new IntPtr(&info));
+                    Debug.Assert(rv == 0);
+
+                    var buf = info.pLayerInfo;
+                    for(var i = 0; i < 40; i++)
+                    {
+                        Console.WriteLine($"{i}: {buf[i].ToString("X2")}");
+                    }
+
+                    var p = (SLayerBSInfo *)info.pLayerInfo;
+                    Console.WriteLine(p->NalCount);
                 }
             }
 
@@ -121,7 +117,7 @@ namespace OpenH264Test
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        private struct SEncParamBase
+        public struct SEncParamBase
         {
             public int UsageType;
             public int PicWidth;
@@ -132,44 +128,35 @@ namespace OpenH264Test
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        private struct SSourcePicture
+        public struct SSourcePicture
         {
             public int ColorFormat;
-
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
-            public int[] Stride;
-
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
-            public IntPtr[] Data;
-
+            public unsafe fixed int Stride[4];
+            public unsafe fixed long pData[4];
             public int PicWidth;
             public int PicHeight;
             public long TimeStamp;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        private struct SLayerBSInfo
+        public struct SLayerBSInfo
         {
             public byte TemporalId;
             public byte SpatialId;
             public byte QualityId;
             public int FrameType;
             public byte LayerType;
-
             public int SubSeqId;
             public int NalCount;
-            public IntPtr NalLengthInByte;
-            public IntPtr BsBuf;
+            public IntPtr pNalLengthInByte;
+            public IntPtr pBsBuf;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        private struct SFrameBSInfo
+        public struct SFrameBSInfo
         {
             public int LayerNum;
-
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 128)]
-            public SLayerBSInfo[] LayerInfo;
-
+            public unsafe fixed byte pLayerInfo[5120];
             public int FrameType;
             public int FrameSizeInBytes;
             public long TimeStamp;
@@ -180,6 +167,9 @@ namespace OpenH264Test
 
         [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
         private delegate int Uninitialize(IntPtr self);
+
+        [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
+        private delegate int EncodeFrame(IntPtr self, IntPtr picInfo, IntPtr bsInfo);
 
         [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
         private delegate int SetOption(IntPtr self, int eOptionId, IntPtr pOption);
