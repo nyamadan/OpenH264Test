@@ -93,15 +93,6 @@ namespace OpenH264Test
 
                     rv = _EncodeFrame(pEncoder, new IntPtr(&pic), new IntPtr(&info));
                     Debug.Assert(rv == 0);
-
-                    var buf = info.pLayerInfo;
-                    for(var i = 0; i < 40; i++)
-                    {
-                        Console.WriteLine($"{i}: {buf[i].ToString("X2")}");
-                    }
-
-                    var p = (SLayerBSInfo *)info.pLayerInfo;
-                    Console.WriteLine(p->NalCount);
                 }
             }
 
@@ -148,15 +139,15 @@ namespace OpenH264Test
             public byte LayerType;
             public int SubSeqId;
             public int NalCount;
-            public IntPtr pNalLengthInByte;
-            public IntPtr pBsBuf;
+            public long pNalLengthInByte;
+            public long pBsBuf;
         }
 
         [StructLayout(LayoutKind.Sequential)]
         public struct SFrameBSInfo
         {
             public int LayerNum;
-            public unsafe fixed byte pLayerInfo[5120];
+            public unsafe fixed long pLayerInfo[640];
             public int FrameType;
             public int FrameSizeInBytes;
             public long TimeStamp;
