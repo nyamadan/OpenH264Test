@@ -46,6 +46,7 @@ namespace OpenH264Test
             const int width = 640;
             const int height = 480;
 
+            /*
             var param = new SEncParamBase();
             param.UsageType = 1;
             param.PicWidth = width;
@@ -54,16 +55,34 @@ namespace OpenH264Test
             param.RCMode = 0;
             param.MaxFrameRate = 15.0f;
 
+            unsafe
+            {
+                rv = _Initialize(pEncoder, new IntPtr(&param));
+                Debug.Assert(rv == 0);
+            }
+            */
+
             var paramExt = new SEncParamExt();
             unsafe
             {
                 rv = _GetDefaultParams(pEncoder, new IntPtr(&paramExt));
                 Debug.Assert(rv == 0);
             }
+            paramExt.UsageType = 1;
+            paramExt.PicWidth = width;
+            paramExt.PicHeight = height;
+            paramExt.TargetBitrate = 500000;
+            paramExt.RCMode = 0;
+            paramExt.MaxFrameRate = 15f;
+
+            paramExt.EnableAdaptiveQuant = false;
+            paramExt.EnableBackgroundDetection = false;
+            paramExt.MinQp = 25;
+            paramExt.MaxQp = 36;
 
             unsafe
             {
-                rv = _Initialize(pEncoder, new IntPtr(&param));
+                rv = _InitializeExt(pEncoder, new IntPtr(&paramExt));
                 Debug.Assert(rv == 0);
             }
 
@@ -198,7 +217,7 @@ namespace OpenH264Test
             public int LevelIdc;
             public int DLayerQp;
 
-            public unsafe fixed long SliceArgument[19];
+            public unsafe fixed byte SliceArgument[152];
 
             [MarshalAs(UnmanagedType.U1)]
             public bool VideoSignalTypePresent;
@@ -231,7 +250,7 @@ namespace OpenH264Test
             public int TemporalLayerNum;
             public int SpatialLayerNum;
 
-            public unsafe fixed int SpatialLayers[200];
+            public unsafe fixed byte SpatialLayers[800];
 
             public int ComplexityMode;
             public uint IntraPeriod;
