@@ -12,7 +12,7 @@ namespace OpenH264Test
         public static extern int WelsCreateSVCEncoder(IntPtr ppEncoder);
 
         [DllImport(OpenH264LibraryName)]
-        public static extern int WelsDestroySVCEncoder(IntPtr pEncoder);
+        public static extern void WelsDestroySVCEncoder(IntPtr pEncoder);
 
         private static int Main(string[] args)
         {
@@ -29,6 +29,8 @@ namespace OpenH264Test
             var methods = new IntPtr[10];
             Marshal.Copy(Marshal.ReadIntPtr(pEncoder, 0), methods, 0, methods.Length);
             var _Initialize = Marshal.GetDelegateForFunctionPointer<Initialize>(methods[0]);
+            var _InitializeExt = Marshal.GetDelegateForFunctionPointer<InitializeExt>(methods[1]);
+            var _GetDefaultParams = Marshal.GetDelegateForFunctionPointer<GetDefaultParams>(methods[2]);
             var _Uninitialize = Marshal.GetDelegateForFunctionPointer<Uninitialize>(methods[3]);
             var _EncodeFrame = Marshal.GetDelegateForFunctionPointer<EncodeFrame>(methods[4]);
             var _SetOption = Marshal.GetDelegateForFunctionPointer<SetOption>(methods[7]);
@@ -51,6 +53,13 @@ namespace OpenH264Test
             param.TargetBitrate = 500000;
             param.RCMode = 0;
             param.MaxFrameRate = 15.0f;
+
+            var paramExt = new SEncParamExt();
+            unsafe
+            {
+                rv = _GetDefaultParams(pEncoder, new IntPtr(&paramExt));
+                Debug.Assert(rv == 0);
+            }
 
             unsafe
             {
@@ -86,7 +95,7 @@ namespace OpenH264Test
 
                 fixed (void* pData = data)
                 {
-                    pic.pData[0] = (long) pData;
+                    pic.pData[0] = (long)pData;
                     pic.pData[1] = pic.pData[0] + width * height;
                     pic.pData[2] = pic.pData[1] + ((width * height) >> 2);
 
@@ -97,12 +106,12 @@ namespace OpenH264Test
                 var frameSize = 0;
                 for (var layerIdx = 0; layerIdx < info.LayerNum; layerIdx++)
                 {
-                    var pLayerBsInfo = (SLayerBSInfo*) info.pLayerInfo + layerIdx;
+                    var pLayerBsInfo = (SLayerBSInfo*)info.pLayerInfo + layerIdx;
 
                     var layerSize = 0;
                     for (var iNalIdx = 0; iNalIdx < pLayerBsInfo->NalCount; iNalIdx++)
                     {
-                        var pNalLengthInByte = (int*) pLayerBsInfo->pNalLengthInByte;
+                        var pNalLengthInByte = (int*)pLayerBsInfo->pNalLengthInByte;
                         layerSize += pNalLengthInByte[iNalIdx];
                     }
 
@@ -161,14 +170,125 @@ namespace OpenH264Test
         public struct SFrameBSInfo
         {
             public int LayerNum;
-            public unsafe fixed long pLayerInfo[640];
+            private int _pad0;
+            public unsafe fixed byte pLayerInfo[5120];
             public int FrameType;
             public int FrameSizeInBytes;
             public long TimeStamp;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        struct SSliceArgument
+        {
+            public int SliceMode;
+            public ushort SliceNum;
+            public unsafe fixed uint SliceMbNum[35];
+            public uint uiSliceSizeConstraint;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct SSpatialLayerConfig
+        {
+            public int VideoWidth;
+            public int VideoHeight;
+            public float FrameRate;
+            public int SpatialBitrate;
+            public int MaxSpatialBitrate;
+            public int ProfileIdc;
+            public int LevelIdc;
+            public int DLayerQp;
+
+            public unsafe fixed long SliceArgument[19];
+
+            [MarshalAs(UnmanagedType.U1)]
+            public bool VideoSignalTypePresent;
+            public byte uiVideoFormat;
+            [MarshalAs(UnmanagedType.U1)]
+            public bool FullRange;
+            [MarshalAs(UnmanagedType.U1)]
+            public bool ColorDescriptionPresent;
+            public byte ColorPrimaries;
+            public byte TransferCharacteristics;
+            public byte ColorMatrix;
+            [MarshalAs(UnmanagedType.U1)]
+            public bool AspectRatioPresent;
+            public int AspectRatio;
+            public ushort AspectRatioExtWidth;
+            public ushort AspectRatioExtHeight;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct SEncParamExt
+        {
+            public int UsageType;
+
+            public int PicWidth;
+            public int PicHeight;
+            public int TargetBitrate;
+            public int RCMode;
+            public float MaxFrameRate;
+
+            public int TemporalLayerNum;
+            public int SpatialLayerNum;
+
+            public unsafe fixed int SpatialLayers[200];
+
+            public int ComplexityMode;
+            public uint IntraPeriod;
+            public int NumRefFrame;
+            public int SpsPpsIdStrategy;
+            [MarshalAs(UnmanagedType.U1)]
+            public bool PrefixNalAddingCtrl;
+            [MarshalAs(UnmanagedType.U1)]
+            public bool EnableSSEI;
+            [MarshalAs(UnmanagedType.U1)]
+            public bool SimulcastAVC;
+            public int PaddingFlag;
+            public int EntropyCodingModeFlag;
+
+            [MarshalAs(UnmanagedType.U1)]
+            public bool EnableFrameSkip;
+            public int MaxBitrate;
+            public int MaxQp;
+            public int MinQp;
+            public uint MaxNalSize;
+
+            [MarshalAs(UnmanagedType.U1)]
+            public bool EnableLongTermReference;
+            public int LTRRefNum;
+            public uint LtrMarkPeriod;
+
+            public ushort MultipleThreadIdc;
+            [MarshalAs(UnmanagedType.U1)]
+            public bool UseLoadBalancing;
+
+            public int LoopFilterDisableIdc;
+            public int LoopFilterAlphaC0Offset;
+            public int LoopFilterBetaOffset;
+
+            [MarshalAs(UnmanagedType.U1)]
+            public bool EnableDenoise;
+            [MarshalAs(UnmanagedType.U1)]
+            public bool EnableBackgroundDetection;
+            [MarshalAs(UnmanagedType.U1)]
+            public bool EnableAdaptiveQuant;
+            [MarshalAs(UnmanagedType.U1)]
+            public bool EnableFrameCroppingFlag;
+            [MarshalAs(UnmanagedType.U1)]
+            public bool EnableSceneChangeDetect;
+
+            [MarshalAs(UnmanagedType.U1)]
+            public bool IsLosslessLink;
+        }
+
         [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
         private delegate int Initialize(IntPtr self, IntPtr param);
+
+        [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
+        private delegate int InitializeExt(IntPtr self, IntPtr param);
+
+        [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
+        private delegate int GetDefaultParams(IntPtr self, IntPtr param);
 
         [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
         private delegate int Uninitialize(IntPtr self);
