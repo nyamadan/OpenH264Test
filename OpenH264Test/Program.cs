@@ -66,8 +66,7 @@ namespace OpenH264Test
                 Debug.Assert(rv == 0);
             }
 
-            var frameSize = width * height * 3 / 2;
-            var data = new byte[frameSize];
+            var data = new byte[width * height * 3 / 2];
 
             var info = new SFrameBSInfo();
             info.LayerNum = 0;
@@ -93,6 +92,21 @@ namespace OpenH264Test
 
                     rv = _EncodeFrame(pEncoder, new IntPtr(&pic), new IntPtr(&info));
                     Debug.Assert(rv == 0);
+                }
+
+                var frameSize = 0;
+                for (var layerIdx = 0; layerIdx < info.LayerNum; layerIdx++)
+                {
+                    var pLayerBsInfo = (SLayerBSInfo*) info.pLayerInfo + layerIdx;
+
+                    var layerSize = 0;
+                    for (var iNalIdx = 0; iNalIdx < pLayerBsInfo->NalCount; iNalIdx++)
+                    {
+                        var pNalLengthInByte = (int*) pLayerBsInfo->pNalLengthInByte;
+                        layerSize += pNalLengthInByte[iNalIdx];
+                    }
+
+                    frameSize += layerSize;
                 }
             }
 
