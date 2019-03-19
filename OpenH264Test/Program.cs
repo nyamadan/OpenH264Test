@@ -44,7 +44,6 @@ namespace OpenH264Test
                 Debug.Assert(rv == 0);
             }
 
-
             const int VideoFormatI420 = 23;
             const int TotalFrame = 100;
             const int Width = 320;
@@ -72,6 +71,7 @@ namespace OpenH264Test
                 rv = _GetDefaultParams(pEncoder, new IntPtr(&paramExt));
                 Debug.Assert(rv == 0);
             }
+
             paramExt.UsageType = 1;
             paramExt.PicWidth = Width;
             paramExt.PicHeight = Height;
@@ -131,9 +131,9 @@ namespace OpenH264Test
                             for (var x = 0; x < Width; x++)
                             {
                                 var rgbIdx = 3 * (y * Width + x);
-                                rgb[rgbIdx + 0] = (float)x / (Width - 1);
-                                rgb[rgbIdx + 1] = (float)y / (Height - 1);
-                                rgb[rgbIdx + 2] = (float)frameIdx / (TotalFrame - 1);
+                                rgb[rgbIdx + 0] = (float) x / (Width - 1);
+                                rgb[rgbIdx + 1] = (float) y / (Height - 1);
+                                rgb[rgbIdx + 2] = (float) frameIdx / (TotalFrame - 1);
                             }
                         }
 
@@ -147,7 +147,7 @@ namespace OpenH264Test
                                 var green = rgb[rgbIdx + 1];
                                 var blue = rgb[rgbIdx + 2];
 
-                                yuv[y * Width + x] = (byte)(255.0f * (0.299f * red + 0.587f * green + 0.114f * blue));
+                                yuv[y * Width + x] = (byte) (255.0f * (0.299f * red + 0.587f * green + 0.114f * blue));
                             }
                         }
 
@@ -161,18 +161,20 @@ namespace OpenH264Test
                                 var blue = rgb[rgbIdx + 2];
 
                                 var yuvIdx = Width * Height;
-                                yuv[yuvIdx + (Width >> 1) * y + x] = (byte)(255.0f * (-0.169f * red - 0.331f * green + 0.5f * blue + 128f));
+                                yuv[yuvIdx + (Width >> 1) * y + x] =
+                                    (byte) (255.0f * (-0.169f * red - 0.331f * green + 0.5f * blue + 128f));
 
                                 yuvIdx += (Width >> 1) * (Height >> 1);
-                                yuv[yuvIdx + (Width >> 1) * y + x] = (byte)(255.0f * (0.5f * red - 0.419f * green - 0.081f * blue + 128f));
+                                yuv[yuvIdx + (Width >> 1) * y + x] =
+                                    (byte) (255.0f * (0.5f * red - 0.419f * green - 0.081f * blue + 128f));
                             }
                         }
 
-                        pic.TimeStamp = (long)Math.Round(frameIdx * (1000 / paramExt.MaxFrameRate));
+                        pic.TimeStamp = (long) Math.Round(frameIdx * (1000 / paramExt.MaxFrameRate));
 
                         fixed (void* pData = yuv)
                         {
-                            pic.pData[0] = (long)pData;
+                            pic.pData[0] = (long) pData;
                             pic.pData[1] = pic.pData[0] + Width * Height;
                             pic.pData[2] = pic.pData[1] + ((Width * Height) >> 2);
 
@@ -183,12 +185,12 @@ namespace OpenH264Test
                         var frameSize = 0;
                         for (var layerIdx = 0; layerIdx < info.LayerNum; layerIdx++)
                         {
-                            var pLayerBsInfo = (SLayerBSInfo*)info.pLayerInfo + layerIdx;
+                            var pLayerBsInfo = (SLayerBSInfo*) info.pLayerInfo + layerIdx;
 
                             var layerSize = 0;
                             for (var iNalIdx = 0; iNalIdx < pLayerBsInfo->NalCount; iNalIdx++)
                             {
-                                var pNalLengthInByte = (int*)pLayerBsInfo->pNalLengthInByte;
+                                var pNalLengthInByte = (int*) pLayerBsInfo->pNalLengthInByte;
                                 layerSize += pNalLengthInByte[iNalIdx];
                             }
 
@@ -290,18 +292,14 @@ namespace OpenH264Test
 
             public unsafe fixed byte SliceArgument[152];
 
-            [MarshalAs(UnmanagedType.U1)]
-            public bool VideoSignalTypePresent;
+            [MarshalAs(UnmanagedType.U1)] public bool VideoSignalTypePresent;
             public byte uiVideoFormat;
-            [MarshalAs(UnmanagedType.U1)]
-            public bool FullRange;
-            [MarshalAs(UnmanagedType.U1)]
-            public bool ColorDescriptionPresent;
+            [MarshalAs(UnmanagedType.U1)] public bool FullRange;
+            [MarshalAs(UnmanagedType.U1)] public bool ColorDescriptionPresent;
             public byte ColorPrimaries;
             public byte TransferCharacteristics;
             public byte ColorMatrix;
-            [MarshalAs(UnmanagedType.U1)]
-            public bool AspectRatioPresent;
+            [MarshalAs(UnmanagedType.U1)] public bool AspectRatioPresent;
             public int AspectRatio;
             public ushort AspectRatioExtWidth;
             public ushort AspectRatioExtHeight;
@@ -327,48 +325,36 @@ namespace OpenH264Test
             public uint IntraPeriod;
             public int NumRefFrame;
             public int SpsPpsIdStrategy;
-            [MarshalAs(UnmanagedType.U1)]
-            public bool PrefixNalAddingCtrl;
-            [MarshalAs(UnmanagedType.U1)]
-            public bool EnableSSEI;
-            [MarshalAs(UnmanagedType.U1)]
-            public bool SimulcastAVC;
+            [MarshalAs(UnmanagedType.U1)] public bool PrefixNalAddingCtrl;
+            [MarshalAs(UnmanagedType.U1)] public bool EnableSSEI;
+            [MarshalAs(UnmanagedType.U1)] public bool SimulcastAVC;
             public int PaddingFlag;
             public int EntropyCodingModeFlag;
 
-            [MarshalAs(UnmanagedType.U1)]
-            public bool EnableFrameSkip;
+            [MarshalAs(UnmanagedType.U1)] public bool EnableFrameSkip;
             public int MaxBitrate;
             public int MaxQp;
             public int MinQp;
             public uint MaxNalSize;
 
-            [MarshalAs(UnmanagedType.U1)]
-            public bool EnableLongTermReference;
+            [MarshalAs(UnmanagedType.U1)] public bool EnableLongTermReference;
             public int LTRRefNum;
             public uint LtrMarkPeriod;
 
             public ushort MultipleThreadIdc;
-            [MarshalAs(UnmanagedType.U1)]
-            public bool UseLoadBalancing;
+            [MarshalAs(UnmanagedType.U1)] public bool UseLoadBalancing;
 
             public int LoopFilterDisableIdc;
             public int LoopFilterAlphaC0Offset;
             public int LoopFilterBetaOffset;
 
-            [MarshalAs(UnmanagedType.U1)]
-            public bool EnableDenoise;
-            [MarshalAs(UnmanagedType.U1)]
-            public bool EnableBackgroundDetection;
-            [MarshalAs(UnmanagedType.U1)]
-            public bool EnableAdaptiveQuant;
-            [MarshalAs(UnmanagedType.U1)]
-            public bool EnableFrameCroppingFlag;
-            [MarshalAs(UnmanagedType.U1)]
-            public bool EnableSceneChangeDetect;
+            [MarshalAs(UnmanagedType.U1)] public bool EnableDenoise;
+            [MarshalAs(UnmanagedType.U1)] public bool EnableBackgroundDetection;
+            [MarshalAs(UnmanagedType.U1)] public bool EnableAdaptiveQuant;
+            [MarshalAs(UnmanagedType.U1)] public bool EnableFrameCroppingFlag;
+            [MarshalAs(UnmanagedType.U1)] public bool EnableSceneChangeDetect;
 
-            [MarshalAs(UnmanagedType.U1)]
-            public bool IsLosslessLink;
+            [MarshalAs(UnmanagedType.U1)] public bool IsLosslessLink;
         }
 
         [UnmanagedFunctionPointer(CallingConvention.ThisCall)]
