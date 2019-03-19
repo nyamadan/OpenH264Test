@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -117,100 +118,93 @@ namespace OpenH264Test
                 pic.Stride[1] = pic.Stride[2] = pic.PicWidth >> 1;
             }
 
-            unsafe
+            using (var fs = new FileStream("test.264", FileMode.Create))
+            using (var bw = new BinaryWriter(fs))
             {
-                for (var frameIdx = 0; frameIdx < TotalFrame; frameIdx++)
+                unsafe
                 {
-                    // render rgb
-                    for(var y = 0; y < Height; y++)
+                    for (var frameIdx = 0; frameIdx < TotalFrame; frameIdx++)
                     {
-                        for(var x = 0; x < Width; x++)
+                        // render rgb
+                        for (var y = 0; y < Height; y++)
                         {
-                            var rgbIdx = 3 * (y * Width + x);
-                            rgb[rgbIdx + 0] = (float)x / (Width - 1);
-                            rgb[rgbIdx + 1] = (float)y / (Height - 1);
-                            rgb[rgbIdx + 2] = (float)frameIdx / (TotalFrame - 1);
-                        }
-                    }
-
-                    // encode yuv
-                    for(var y = 0; y < Height; y++)
-                    {
-                        for(var x = 0; x < Width; x++)
-                        {
-                            var rgbIdx = 3 * (y * Width + x);
-                            var R = rgb[rgbIdx + 0];
-                            var G = rgb[rgbIdx + 1];
-                            var B = rgb[rgbIdx + 2];
-
-                            var Y = (byte)(255.0f * (0.299f * R + 0.587f * G + 0.114f * B));
-                            var U = (byte)(255.0f * (-0.169f * R - 0.331f * G + 0.5f * B + 128f));
-                            var V = (byte)(255.0f * (0.5f * R - 0.419f * G - 0.081f * B + 128f));
-
-                            var yuvIdx = 0;
-                            yuv[yuvIdx + y * Width + x] = Y;
-                            yuvIdx += Width * Height;
-                            yuv[yuvIdx + (Width / 2) * (y / 2) + x / 2] = U;
-                            yuvIdx += (Width / 2) * (Height / 2);
-                            yuv[yuvIdx + (Width / 2) * (y / 2) + x / 2] = V;
-                        }
-                    }
-
-                    pic.TimeStamp = (long)Math.Round(frameIdx * (1000 / paramExt.MaxFrameRate));
-
-                    fixed (void* pData = yuv)
-                    {
-                        pic.pData[0] = (long)pData;
-                        pic.pData[1] = pic.pData[0] + Width * Height;
-                        pic.pData[2] = pic.pData[1] + ((Width * Height) >> 2);
-
-                        rv = _EncodeFrame(pEncoder, new IntPtr(&pic), new IntPtr(&info));
-                        Debug.Assert(rv == 0);
-                    }
-
-                    var frameSize = 0;
-                    for (var layerIdx = 0; layerIdx < info.LayerNum; layerIdx++)
-                    {
-                        var pLayerBsInfo = (SLayerBSInfo*)info.pLayerInfo + layerIdx;
-
-                        var layerSize = 0;
-                        for (var iNalIdx = 0; iNalIdx < pLayerBsInfo->NalCount; iNalIdx++)
-                        {
-                            var pNalLengthInByte = (int*)pLayerBsInfo->pNalLengthInByte;
-                            layerSize += pNalLengthInByte[iNalIdx];
-                        }
-
-                        if (paramExt.SpatialLayerNum == 1)
-                        {
-                            // fwrite(pLayerBsInfo->pBsBuf, 1, iLayerSize, pFpBs[0]); // write pure bit stream into file
-                        }
-                        else
-                        {
-                            //multi bs file write
-                            if (pLayerBsInfo->SpatialId == 0)
+                            for (var x = 0; x < Width; x++)
                             {
-                                var pBsBuf = (byte *)pLayerBsInfo->pBsBuf;
-                                var five_bits = pBsBuf[4] & 0x1f;
-                                if ((five_bits == 0x07) || (five_bits == 0x08))
-                                {
-                                    //sps or pps
-                                    for (int i = 0; i < paramExt.SpatialLayerNum; ++i)
-                                    {
-                                        // fwrite(pLayerBsInfo->pBsBuf, 1, layerSize, pFpBs[i]);
-                                    }
-                                }
-                                else
-                                {
-                                    // fwrite(pLayerBsInfo->pBsBuf, 1, layerSize, pFpBs[0]);
-                                }
+                                var rgbIdx = 3 * (y * Width + x);
+                                rgb[rgbIdx + 0] = (float)x / (Width - 1);
+                                rgb[rgbIdx + 1] = (float)y / (Height - 1);
+                                rgb[rgbIdx + 2] = (float)frameIdx / (TotalFrame - 1);
+                            }
+                        }
+
+                        // encode yuv
+                        for (var y = 0; y < Height; y++)
+                        {
+                            for (var x = 0; x < Width; x++)
+                            {
+                                var rgbIdx = 3 * (y * Width + x);
+                                var red = rgb[rgbIdx + 0];
+                                var green = rgb[rgbIdx + 1];
+                                var blue = rgb[rgbIdx + 2];
+
+                                yuv[y * Width + x] = (byte)(255.0f * (0.299f * red + 0.587f * green + 0.114f * blue));
+                            }
+                        }
+
+                        for (var y = 0; y < Height >> 1; y++)
+                        {
+                            for (var x = 0; x < Width >> 1; x++)
+                            {
+                                var rgbIdx = 3 * (y * Width + x);
+                                var red = rgb[rgbIdx + 0];
+                                var green = rgb[rgbIdx + 1];
+                                var blue = rgb[rgbIdx + 2];
+
+                                var yuvIdx = Width * Height;
+                                yuv[yuvIdx + (Width >> 1) * y + x] = (byte)(255.0f * (-0.169f * red - 0.331f * green + 0.5f * blue + 128f));
+
+                                yuvIdx += (Width >> 1) * (Height >> 1);
+                                yuv[yuvIdx + (Width >> 1) * y + x] = (byte)(255.0f * (0.5f * red - 0.419f * green - 0.081f * blue + 128f));
+                            }
+                        }
+
+                        pic.TimeStamp = (long)Math.Round(frameIdx * (1000 / paramExt.MaxFrameRate));
+
+                        fixed (void* pData = yuv)
+                        {
+                            pic.pData[0] = (long)pData;
+                            pic.pData[1] = pic.pData[0] + Width * Height;
+                            pic.pData[2] = pic.pData[1] + ((Width * Height) >> 2);
+
+                            rv = _EncodeFrame(pEncoder, new IntPtr(&pic), new IntPtr(&info));
+                            Debug.Assert(rv == 0);
+                        }
+
+                        var frameSize = 0;
+                        for (var layerIdx = 0; layerIdx < info.LayerNum; layerIdx++)
+                        {
+                            var pLayerBsInfo = (SLayerBSInfo*)info.pLayerInfo + layerIdx;
+
+                            var layerSize = 0;
+                            for (var iNalIdx = 0; iNalIdx < pLayerBsInfo->NalCount; iNalIdx++)
+                            {
+                                var pNalLengthInByte = (int*)pLayerBsInfo->pNalLengthInByte;
+                                layerSize += pNalLengthInByte[iNalIdx];
+                            }
+
+                            if (paramExt.SpatialLayerNum == 1)
+                            {
+                                var buf = new byte[layerSize];
+                                Marshal.Copy(new IntPtr(pLayerBsInfo->pBsBuf), buf, 0, layerSize);
+                                bw.Write(buf);
                             }
                             else
                             {
-                                // fwrite(pLayerBsInfo->pBsBuf, 1, layerSize, pFpBs[pLayerBsInfo->SpatialId]);
+                                throw new NotImplementedException();
                             }
-                        }
 
-                        frameSize += layerSize;
+                            frameSize += layerSize;
+                        }
                     }
                 }
             }
