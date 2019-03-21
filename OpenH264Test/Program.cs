@@ -77,7 +77,7 @@ namespace OpenH264Test
             paramExt.PicHeight = Height;
             paramExt.TargetBitrate = 500000;
             paramExt.RCMode = 0;
-            paramExt.MaxFrameRate = 15f;
+            paramExt.MaxFrameRate = 30001f / 1001f;
 
             paramExt.EnableAdaptiveQuant = false;
             paramExt.EnableBackgroundDetection = false;
@@ -108,10 +108,10 @@ namespace OpenH264Test
             pic.PicWidth = Width;
             pic.PicHeight = Height;
             pic.ColorFormat = VideoFormatI420;
-            pic.TimeStamp = 0;
+            pic.TimeStamp = 0L;
 
-            var rgb = new float[Width * Height * 3];
-            var yuv = new byte[Width * Height * 3 / 2];
+            var bufferRGB = new float[Width * Height * 3];
+            var bufferYUV = new byte[Width * Height * 3 / 2];
             unsafe
             {
                 pic.Stride[0] = pic.PicWidth;
@@ -121,76 +121,79 @@ namespace OpenH264Test
             using (var fs = new FileStream("test.264", FileMode.Create))
             using (var bw = new BinaryWriter(fs))
             {
-                unsafe
+                for (var frameIdx = 0; frameIdx < TotalFrame; frameIdx++)
                 {
-                    for (var frameIdx = 0; frameIdx < TotalFrame; frameIdx++)
+                    // render rgb
+                    for (var y = 0; y < Height; y++)
                     {
-                        // render rgb
-                        for (var y = 0; y < Height; y++)
+                        for (var x = 0; x < Width; x++)
                         {
-                            for (var x = 0; x < Width; x++)
-                            {
-                                var rgbIdx = 3 * (y * Width + x);
-                                rgb[rgbIdx + 0] = (float) x / (Width - 1);
-                                rgb[rgbIdx + 1] = (float) y / (Height - 1);
-                                rgb[rgbIdx + 2] = (float) frameIdx / (TotalFrame - 1);
-                            }
+                            var rgbIdx = 3 * (y * Width + x);
+                            bufferRGB[rgbIdx + 0] = (float)x / (Width - 1);
+                            bufferRGB[rgbIdx + 1] = (float)y / (Height - 1);
+                            bufferRGB[rgbIdx + 2] = (float)frameIdx / (TotalFrame - 1);
                         }
+                    }
 
-                        // encode yuv
-                        for (var y = 0; y < Height; y++)
+                    // encode yuv
+                    for (var y = 0; y < Height; y++)
+                    {
+                        for (var x = 0; x < Width; x++)
                         {
-                            for (var x = 0; x < Width; x++)
-                            {
-                                var rgbIdx = 3 * (y * Width + x);
-                                var red = rgb[rgbIdx + 0];
-                                var green = rgb[rgbIdx + 1];
-                                var blue = rgb[rgbIdx + 2];
-
-                                yuv[y * Width + x] = (byte) (255.0f * (0.299f * red + 0.587f * green + 0.114f * blue));
-                            }
+                            var rgbIdx = 3 * (y * Width + x);
+                            var red = 255f * bufferRGB[rgbIdx + 0];
+                            var green = 255f * bufferRGB[rgbIdx + 1];
+                            var blue = 255f * bufferRGB[rgbIdx + 2];
+                            bufferYUV[y * Width + x] =
+                                (byte)(0.2569f * red + 0.5044f * green + 0.0979f * blue + 16f);
                         }
+                    }
 
-                        for (var y = 0; y < Height >> 1; y++)
+                    for (var y = 0; y < Height >> 1; y++)
+                    {
+                        for (var x = 0; x < Width >> 1; x++)
                         {
-                            for (var x = 0; x < Width >> 1; x++)
-                            {
-                                var rgbIdx = 3 * (y * Width + x);
-                                var red = rgb[rgbIdx + 0];
-                                var green = rgb[rgbIdx + 1];
-                                var blue = rgb[rgbIdx + 2];
+                            var rgbIdx = 3 * (y * Width + x);
+                            var red = 255f * bufferRGB[rgbIdx + 0];
+                            var green = 255f * bufferRGB[rgbIdx + 1];
+                            var blue = 255f * bufferRGB[rgbIdx + 2];
 
-                                var yuvIdx = Width * Height;
-                                yuv[yuvIdx + (Width >> 1) * y + x] =
-                                    (byte) (255.0f * (-0.169f * red - 0.331f * green + 0.5f * blue + 128f));
+                            var yuvIdx = Width * Height;
+                            bufferYUV[yuvIdx + (Width >> 1) * y + x] =
+                                (byte)(-0.1483f * red - 0.2911f * green + 0.4394f * blue + 128f);
 
-                                yuvIdx += (Width >> 1) * (Height >> 1);
-                                yuv[yuvIdx + (Width >> 1) * y + x] =
-                                    (byte) (255.0f * (0.5f * red - 0.419f * green - 0.081f * blue + 128f));
-                            }
+                            yuvIdx += (Width >> 1) * (Height >> 1);
+                            bufferYUV[yuvIdx + (Width >> 1) * y + x] =
+                                (byte)(0.4394f * red - 0.3679 * green - 0.0715 * blue + 128f);
                         }
+                    }
 
-                        pic.TimeStamp = (long) Math.Round(frameIdx * (1000 / paramExt.MaxFrameRate));
+                    pic.TimeStamp = (long)Math.Round(frameIdx * (1000 / paramExt.MaxFrameRate));
 
-                        fixed (void* pData = yuv)
+                    unsafe
+                    {
+                        fixed (void* pData = bufferYUV)
                         {
-                            pic.pData[0] = (long) pData;
+                            pic.pData[0] = (long)pData;
                             pic.pData[1] = pic.pData[0] + Width * Height;
                             pic.pData[2] = pic.pData[1] + ((Width * Height) >> 2);
 
                             rv = _EncodeFrame(pEncoder, new IntPtr(&pic), new IntPtr(&info));
                             Debug.Assert(rv == 0);
                         }
+                    }
 
-                        var frameSize = 0;
-                        for (var layerIdx = 0; layerIdx < info.LayerNum; layerIdx++)
+                    var frameSize = 0;
+                    for (var layerIdx = 0; layerIdx < info.LayerNum; layerIdx++)
+                    {
+                        var layerSize = 0;
+
+                        unsafe
                         {
-                            var pLayerBsInfo = (SLayerBSInfo*) info.pLayerInfo + layerIdx;
-
-                            var layerSize = 0;
+                            var pLayerBsInfo = (SLayerBSInfo*)info.pLayerInfo + layerIdx;
                             for (var iNalIdx = 0; iNalIdx < pLayerBsInfo->NalCount; iNalIdx++)
                             {
-                                var pNalLengthInByte = (int*) pLayerBsInfo->pNalLengthInByte;
+                                var pNalLengthInByte = (int*)pLayerBsInfo->pNalLengthInByte;
                                 layerSize += pNalLengthInByte[iNalIdx];
                             }
 
@@ -204,9 +207,9 @@ namespace OpenH264Test
                             {
                                 throw new NotImplementedException();
                             }
-
-                            frameSize += layerSize;
                         }
+
+                        frameSize += layerSize;
                     }
                 }
             }
