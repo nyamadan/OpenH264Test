@@ -391,6 +391,27 @@ namespace OpenH264Test
             set_pos_bits(bs, 0);
         }
 
+        static unsafe bool memcmp<T>(T[] a, T[] b, int length) where T : IComparable<T>
+        {
+            for (var i = 0; i < length; i++)
+            {
+                if(a[i].CompareTo(b[i]) != 0)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        static unsafe void memcpy(void* dst, void* src, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                ((byte *)dst)[i] = ((byte *)src)[i];
+            }
+        }
+
         static unsafe bool memcmp(void* a, void* b, int length)
         {
             for (var i = 0; i < length; i++)
