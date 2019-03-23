@@ -155,6 +155,13 @@ namespace OpenH264Test
         const int MINIMP4_MAX_SPS = 32;
         const int MINIMP4_MAX_PPS = 256;
 
+        private static unsafe int MP4E__set_sps(MP4E_mux_t mux, int track_id, void* sps, int bytes)
+        {
+            track_t tr = mux.tracks.data + track_id;
+            Debug.Assert(tr.info.track_media_kind == track_media_kind.e_video);
+            return append_mem(tr.vsps, sps, bytes) ? MP4E_STATUS_OK : MP4E_STATUS_NO_MEMORY;
+        }
+
         private static unsafe int Mp4H26xWriteNal(mp4_h26x_writer_t h, byte* nal, int length, uint timeStamp90kHz_next)
         {
             const int MP4E_SAMPLE_DEFAULT = 0;   // (beginning of) audio or video frame
@@ -267,6 +274,25 @@ namespace OpenH264Test
             e_private
         }
 
+
+        public class minimp4_vector_t
+        {
+            public byte[] data;
+            public int bytes;
+            public int capacity;
+        }
+
+        public class track_t
+        {
+            public MP4E_track_t info;
+            public minimp4_vector_t smpl;  // sample descriptor
+            public minimp4_vector_t pending_sample;
+
+            public minimp4_vector_t vsps;  // or dsi for audio
+            public minimp4_vector_t vpps;  // not used for audio
+            public minimp4_vector_t vvps;  // used for HEVC
+        }
+
         public class MP4E_track_t
         {
             // MP4 object type code, which defined codec class for the track.
@@ -303,23 +329,16 @@ namespace OpenH264Test
             public long u;
         }
 
-        public class minimp4_vector_t
-        {
-            byte[] data;
-            int bytes;
-            int capacity;
-        }
-
         public class MP4E_mux_t
         {
-            minimp4_vector_t tracks;
+            public minimp4_vector_t tracks;
 
-            long write_pos;
-            long mdat_pos;
+            public long write_pos;
+            public long mdat_pos;
 
-            string text_comment;
+            public string text_comment;
 
-            int sequential_mode_flag;
+            public int sequential_mode_flag;
         }
 
         public class mp4_h26x_writer_t
