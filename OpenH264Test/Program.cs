@@ -159,11 +159,40 @@ namespace OpenH264Test
         const int MINIMP4_MAX_SPS = 32;
         const int MINIMP4_MAX_PPS = 256;
 
+        private static unsafe int append_mem(minimp4_vector_t v, void* mem, int bytes)
+        {
+            int i;
+            var size = new byte[2];
+            var p = v.data;
+            for (i = 0; i + 2 < v.bytes;)
+            {
+                int cb = p[i] * 256 + p[i + 1];
+                var subarray = new byte[cb];
+                Array.Copy(p, i + 2, subarray, 0, cb);
+                if (cb == bytes && !memcmp(subarray, mem, cb))
+                {
+                    return 1;
+                }
+                i += 2 + cb;
+            }
+            size[0] = (byte)(bytes >> 8);
+            size[1] = (byte)bytes;
+            var ret = minimp4_vector_put(v, size, 2) && minimp4_vector_put(v, mem, bytes);
+
+            return ret;
+        }
+
+        const int MP4E_STATUS_OK = 0;
+        const int MP4E_STATUS_BAD_ARGUMENTS = -1;
+        const int MP4E_STATUS_NO_MEMORY = -2;
+        const int MP4E_STATUS_FILE_WRITE_ERROR = -3;
+        const int MP4E_STATUS_ONLY_ONE_DSI_ALLOWED = -4;
+
         private static unsafe int MP4E__set_sps(MP4E_mux_t mux, int track_id, void* sps, int bytes)
         {
-            track_t tr = mux.tracks.data + track_id;
+            track_t tr = mux.tracks[track_id];
             Debug.Assert(tr.info.track_media_kind == track_media_kind.e_video);
-            return append_mem(tr.vsps, sps, bytes) ? MP4E_STATUS_OK : MP4E_STATUS_NO_MEMORY;
+            return append_mem(tr.vsps, sps, bytes)  != 0 ? MP4E_STATUS_OK : MP4E_STATUS_NO_MEMORY;
         }
 
         private static unsafe int Mp4H26xWriteNal(mp4_h26x_writer_t h, byte* nal, int length, uint timeStamp90kHz_next)
@@ -341,7 +370,7 @@ namespace OpenH264Test
 
         public class MP4E_mux_t
         {
-            public minimp4_vector_t tracks;
+            public track_t[] tracks;
 
             public long write_pos;
             public long mdat_pos;
@@ -583,6 +612,19 @@ namespace OpenH264Test
             for (var i = 0; i < length; i++)
             {
                 if (((byte*) a)[i] != b[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        static unsafe bool memcmp(byte[] a, void* b, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                if ([i] != ((byte*)b)[i])
                 {
                     return false;
                 }
