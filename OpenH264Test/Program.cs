@@ -159,6 +159,33 @@ namespace OpenH264Test
         const int MINIMP4_MAX_SPS = 32;
         const int MINIMP4_MAX_PPS = 256;
 
+        private static unsafe int minimp4_vector_alloc_tail(minimp4_vector_t h, int bytes)
+        {
+            if (h.data == null && !minimp4_vector_init(h, 2 * bytes + 1024))
+            {
+                return -1;
+            }
+            if (h.capacity - h.bytes < bytes && !minimp4_vector_grow(h, bytes))
+            {
+                return -1;
+            }
+            Debug.Assert(h.data != null);
+            Debug.Assert(h.capacity - h.bytes >= bytes);
+            int p = h.bytes;
+            h.bytes += bytes;
+            return p;
+        }
+
+        private static unsafe int minimp4_vector_put(minimp4_vector_t h, void* buf, int bytes)
+        {
+            int tail = minimp4_vector_alloc_tail(h, bytes);
+            if (tail != -1)
+            {
+                fixed(byte *data = h.data) memcpy(data + tail, buf, bytes);
+            }
+            return tail;
+        }
+
         private static unsafe int append_mem(minimp4_vector_t v, void* mem, int bytes)
         {
             int i;
@@ -177,9 +204,11 @@ namespace OpenH264Test
             }
             size[0] = (byte)(bytes >> 8);
             size[1] = (byte)bytes;
-            var ret = minimp4_vector_put(v, size, 2) && minimp4_vector_put(v, mem, bytes);
 
-            return ret;
+            fixed(byte * buf = size)
+            {
+                return minimp4_vector_put(v, buf, 2) != -1 && minimp4_vector_put(v, mem, bytes) != -1 ? 1 : 0;
+            }
         }
 
         const int MP4E_STATUS_OK = 0;
