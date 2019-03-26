@@ -159,6 +159,32 @@ namespace OpenH264Test
         const int MINIMP4_MAX_SPS = 32;
         const int MINIMP4_MAX_PPS = 256;
 
+        private static bool minimp4_vector_init(minimp4_vector_t h, int capacity)
+        {
+            h.bytes = 0;
+            h.capacity = capacity;
+            h.data = capacity != 0 ? new byte[capacity] : null;
+            return capacity == 0 || h.data == null;
+        }
+
+        static bool minimp4_vector_grow(minimp4_vector_t h, int bytes)
+        {
+            byte[] p;
+            int new_size = h.capacity * 2 + 1024;
+            if (new_size < h.capacity + bytes)
+            {
+                new_size = h.capacity + bytes + 1024;
+            }
+            p = new byte[new_size];
+            if (p == null)
+            {
+                return false;
+            }
+            h.data = p;
+            h.capacity = new_size;
+            return true;
+        }
+
         private static unsafe int minimp4_vector_alloc_tail(minimp4_vector_t h, int bytes)
         {
             if (h.data == null && !minimp4_vector_init(h, 2 * bytes + 1024))
