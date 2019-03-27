@@ -180,6 +180,13 @@ namespace OpenH264Test
             {
                 return false;
             }
+            unsafe
+            {
+                fixed(byte *pp = h.data)
+                {
+                    memcpy(p, pp, h.capacity);
+                }
+            }
             h.data = p;
             h.capacity = new_size;
             return true;
@@ -679,7 +686,7 @@ namespace OpenH264Test
         {
             for (var i = 0; i < length; i++)
             {
-                if ([i] != ((byte*)b)[i])
+                if (a[i] != ((byte*)b)[i])
                 {
                     return false;
                 }
