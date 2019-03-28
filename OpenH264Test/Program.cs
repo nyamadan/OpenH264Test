@@ -257,6 +257,13 @@ namespace OpenH264Test
             return append_mem(tr.vsps, sps, bytes)  != 0 ? MP4E_STATUS_OK : MP4E_STATUS_NO_MEMORY;
         }
 
+        private static unsafe int MP4E__set_pps(MP4E_mux_t mux, int track_id, void* pps, int bytes)
+        {
+            track_t tr = mux.tracks[track_id];
+            Debug.Assert(tr.info.track_media_kind == track_media_kind.e_video);
+            return append_mem(tr.vpps, pps, bytes) != 0 ? MP4E_STATUS_OK : MP4E_STATUS_NO_MEMORY;
+        }
+
         private static unsafe int Mp4H26xWriteNal(mp4_h26x_writer_t h, byte* nal, int length, uint timeStamp90kHz_next)
         {
             const int MP4E_SAMPLE_DEFAULT = 0; // (beginning of) audio or video frame
